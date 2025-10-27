@@ -31,6 +31,14 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	// Handle sending a message
 	const handleSendMessage = useCallback(
 		async (text: string, images: string[], files: string[], fromQueue = false) => {
+			console.log("[useMessageHandlers] handleSendMessage called:", {
+				textLength: text.length,
+				imagesCount: images.length,
+				filesCount: files.length,
+				fromQueue,
+				sendingDisabled,
+			})
+
 			let messageToSend = text.trim()
 			const hasContent = messageToSend || images.length > 0 || files.length > 0
 
@@ -47,6 +55,12 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 				if (sendingDisabled && !fromQueue) {
 					// Generate a unique ID using timestamp + random component
 					const messageId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+					console.log("[useMessageHandlers] QUEUEING message:", {
+						messageId,
+						text: messageToSend,
+						imagesCount: images.length,
+						filesCount: files.length,
+					})
 					setMessageQueue((prev) => [...prev, { id: messageId, text: messageToSend, images, files }])
 					setInputValue("")
 					setSelectedImages([])
@@ -54,7 +68,12 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					return
 				}
 
-				console.log("[ChatView] handleSendMessage - Sending message:", messageToSend)
+				console.log("[useMessageHandlers] SENDING message:", {
+					messageToSend,
+					fromQueue,
+					messagesLength: messages.length,
+					clineAsk,
+				})
 				if (messages.length === 0) {
 					await TaskServiceClient.newTask(
 						NewTaskRequest.create({

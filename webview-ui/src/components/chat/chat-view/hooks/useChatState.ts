@@ -1,5 +1,5 @@
 import { ClineMessage, QueuedMessage } from "@shared/ExtensionMessage"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChatState } from "../types/chatTypes"
 
 /**
@@ -23,6 +23,14 @@ export function useChatState(messages: ClineMessage[]): ChatState {
 
 	// Message queue state
 	const [messageQueue, setMessageQueue] = useState<QueuedMessage[]>([])
+
+	// Debug: Log queue state changes
+	useEffect(() => {
+		console.log("[useChatState] Message queue updated:", {
+			queueLength: messageQueue.length,
+			queue: messageQueue,
+		})
+	}, [messageQueue])
 
 	// Refs
 	const textAreaRef = useRef<HTMLTextAreaElement>(null)

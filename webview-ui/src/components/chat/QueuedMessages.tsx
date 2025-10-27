@@ -10,7 +10,13 @@ interface QueuedMessagesProps {
 const QueuedMessages: React.FC<QueuedMessagesProps> = ({ queue, onRemove, onUpdate }) => {
 	const [editingStates, setEditingStates] = useState<Record<string, { isEditing: boolean; value: string }>>({})
 
+	console.log("[QueuedMessages] Component rendered:", {
+		queueLength: queue.length,
+		queue,
+	})
+
 	if (queue.length === 0) {
+		console.log("[QueuedMessages] Queue is empty, returning null")
 		return null
 	}
 
@@ -26,8 +32,21 @@ const QueuedMessages: React.FC<QueuedMessagesProps> = ({ queue, onRemove, onUpda
 	}
 
 	const handleSaveEdit = (index: number, messageId: string, newValue: string) => {
+		console.log("[QueuedMessages] Saving edit:", {
+			index,
+			messageId,
+			newValue,
+		})
 		onUpdate(index, newValue)
 		setEditState(messageId, false)
+	}
+
+	const handleRemove = (index: number, messageId: string) => {
+		console.log("[QueuedMessages] Removing message:", {
+			index,
+			messageId,
+		})
+		onRemove(index)
 	}
 
 	return (
@@ -81,7 +100,7 @@ const QueuedMessages: React.FC<QueuedMessagesProps> = ({ queue, onRemove, onUpda
 									className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-icon-foreground)] transition-colors"
 									onClick={(e) => {
 										e.stopPropagation()
-										onRemove(index)
+										handleRemove(index, message.id)
 									}}
 									title="Remove from queue">
 									<span className="codicon codicon-trash text-sm" />
