@@ -21,13 +21,16 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 		setSelectedFiles,
 		setSendingDisabled,
 		setEnableButtons,
+		sendingDisabled,
 		clineAsk,
 		lastMessage,
+		messageQueue,
+		setMessageQueue,
 	} = chatState
 
 	// Handle sending a message
 	const handleSendMessage = useCallback(
-		async (text: string, images: string[], files: string[]) => {
+		async (text: string, images: string[], files: string[], fromQueue = false) => {
 			let messageToSend = text.trim()
 			const hasContent = messageToSend || images.length > 0 || files.length > 0
 
@@ -40,6 +43,17 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			}
 
 			if (hasContent) {
+				// If sending is disabled and this is not from the queue, add to queue
+				if (sendingDisabled && !fromQueue) {
+					// Generate a unique ID using timestamp + random component
+					const messageId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+					setMessageQueue((prev) => [...prev, { id: messageId, text: messageToSend, images, files }])
+					setInputValue("")
+					setSelectedImages([])
+					setSelectedFiles([])
+					return
+				}
+
 				console.log("[ChatView] handleSendMessage - Sending message:", messageToSend)
 				if (messages.length === 0) {
 					await TaskServiceClient.newTask(
@@ -95,12 +109,14 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			messages.length,
 			clineAsk,
 			activeQuote,
+			sendingDisabled,
 			setInputValue,
 			setActiveQuote,
 			setSendingDisabled,
 			setSelectedImages,
 			setSelectedFiles,
 			setEnableButtons,
+			setMessageQueue,
 			chatState,
 		],
 	)
