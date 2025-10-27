@@ -28,6 +28,7 @@ import {
 	useScrollBehavior,
 	WelcomeSection,
 } from "./chat-view"
+import QueuedMessages from "./QueuedMessages"
 
 interface ChatViewProps {
 	isHidden: boolean
@@ -398,6 +399,13 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			</div>
 			<footer className="bg-[var(--vscode-sidebar-background)]" style={{ gridRow: "2" }}>
 				<AutoApproveBar />
+				<QueuedMessages
+					onRemove={(index) => chatState.setMessageQueue((prev) => prev.filter((_, i) => i !== index))}
+					onUpdate={(index, newText) => {
+						chatState.setMessageQueue((prev) => prev.map((msg, i) => (i === index ? { ...msg, text: newText } : msg)))
+					}}
+					queue={chatState.messageQueue}
+				/>
 				<ActionButtons
 					chatState={chatState}
 					messageHandlers={messageHandlers}
