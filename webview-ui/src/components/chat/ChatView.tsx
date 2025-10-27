@@ -300,6 +300,36 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		}
 	}, [isHidden, sendingDisabled, enableButtons])
 
+	// Queue processing effect - processes queued messages when sending becomes enabled
+	useEffect(() => {
+		const { messageQueue, setMessageQueue, clineAsk } = chatState
+
+		// Early return if conditions aren't met
+		// Don't process queue if there's an API error (clineAsk === "api_req_failed")
+		if (sendingDisabled || messageQueue.length === 0 || clineAsk === "api_req_failed") {
+			return
+		}
+
+		// Process the first message in the queue
+		const [nextMessage, ...remaining] = messageQueue
+
+		// Update queue immediately to prevent duplicate processing
+		setMessageQueue(remaining)
+
+		// Process the message asynchronously
+		const processMessage = async () => {
+			try {
+				await messageHandlers.handleSendMessage(nextMessage.text, nextMessage.images, nextMessage.files, true)
+			} catch (error) {
+				console.error("Failed to send queued message:", error)
+				// On error, re-add the message to the end of the queue for retry
+				setMessageQueue((current) => [...current, nextMessage])
+			}
+		}
+
+		processMessage()
+	}, [sendingDisabled, chatState, messageHandlers])
+
 	const visibleMessages = useMemo(() => {
 		return filterVisibleMessages(modifiedMessages)
 	}, [modifiedMessages])
