@@ -105,20 +105,19 @@ import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "un
  * const response = await fetch('https://api.example.com')
  * ```
  */
-export let fetch: typeof globalThis.fetch = globalThis.fetch
-
-/**
- * Configures this module's `fetch` for the core outside VSCode. This function
- * must be called at startup before `fetch` is used.
- */
-export function configureFetchForStandalone() {
+export const fetch: typeof globalThis.fetch = (() => {
 	// Note: Don't use Logger here; it may not be initialized.
 
-	// Standalone (JetBrains/CLI): configure undici with ProxyAgent
-	const agent = new EnvHttpProxyAgent({})
-	setGlobalDispatcher(agent)
-	fetch = undiciFetch as unknown as typeof globalThis.fetch
-}
+	// Note: See esbuild.mjs, process.env.IS_STANDALONE is statically rewritten
+	// 'true' in the JetBrains/CLI build.
+	if (process.env.IS_STANDALONE) {
+		// Configure undici with ProxyAgent
+		const agent = new EnvHttpProxyAgent({})
+		setGlobalDispatcher(agent)
+		return undiciFetch as unknown as typeof globalThis.fetch
+	}
+	return globalThis.fetch
+})()
 
 /**
  * Returns axios configuration for fetch adapter mode with our configured fetch.

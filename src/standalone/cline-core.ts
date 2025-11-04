@@ -9,7 +9,6 @@ import { WebviewProvider } from "@/core/webview"
 import { AuthHandler } from "@/hosts/external/AuthHandler"
 import { HostProvider } from "@/hosts/host-provider"
 import { DiffViewProvider } from "@/integrations/editor/DiffViewProvider"
-import { configureFetchForStandalone } from "@/shared/net"
 import { HOSTBRIDGE_PORT, waitForHostBridgeReady } from "./hostbridge-client"
 import { setLockManager } from "./lock-manager"
 import { PROTOBUS_PORT, startProtobusService } from "./protobus-service"
@@ -30,8 +29,6 @@ async function main() {
 		showHelp()
 		process.exit(0)
 	}
-
-	configureFetchForStandalone()
 
 	// Initialize context with optional custom directory from CLI
 	const { extensionContext, DATA_DIR, EXTENSION_DIR } = initializeContext(args.config)
