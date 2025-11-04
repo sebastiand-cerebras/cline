@@ -95,6 +95,8 @@
 
 import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "undici"
 
+let mockFetch: typeof globalThis.fetch | undefined
+
 /**
  * Platform-configured fetch that respects proxy settings.
  * Use this instead of global fetch to ensure proper proxy configuration.
@@ -108,16 +110,47 @@ import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "un
 export const fetch: typeof globalThis.fetch = (() => {
 	// Note: Don't use Logger here; it may not be initialized.
 
+	let baseFetch: typeof globalThis.fetch = globalThis.fetch
 	// Note: See esbuild.mjs, process.env.IS_STANDALONE is statically rewritten
 	// 'true' in the JetBrains/CLI build.
 	if (process.env.IS_STANDALONE) {
 		// Configure undici with ProxyAgent
 		const agent = new EnvHttpProxyAgent({})
 		setGlobalDispatcher(agent)
-		return undiciFetch as unknown as typeof globalThis.fetch
+		baseFetch = undiciFetch as any as typeof globalThis.fetch
 	}
-	return globalThis.fetch
+
+	return (input: string | URL | Request, init?: RequestInit): Promise<Response> => (mockFetch || baseFetch)(input, init)
 })()
+
+/**
+ * Mocks `fetch` for testing and calls `callback`. Then restores `fetch`. If the
+ * specified callback returns a Promise, the fetch is restored when that Promise
+ * is settled.
+ * @param theFetch the replacement function to call to implement `fetch`.
+ * @param callback `fetch` will be mocked for the duration of `callback()`.
+ * @returns the result of `callback()`.
+ */
+export function mockFetchForTesting<T>(theFetch: typeof globalThis.fetch, callback: () => T): T {
+	const originalMockFetch = mockFetch
+	mockFetch = theFetch
+	let willResetSync = true
+	try {
+		const result = callback()
+		if (result instanceof Promise) {
+			willResetSync = false
+			return result.finally(() => {
+				mockFetch = originalMockFetch
+			}) as typeof result
+		} else {
+			return result
+		}
+	} finally {
+		if (willResetSync) {
+			mockFetch = originalMockFetch
+		}
+	}
+}
 
 /**
  * Returns axios configuration for fetch adapter mode with our configured fetch.
