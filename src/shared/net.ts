@@ -1,53 +1,71 @@
 /**
- * NETWORK CONFIGURATION FOR CLINE
+ * # Network Support for Cline
+ *
+ * ## Development
+ *
+ * **Do** use `import { fetch } from '@/shared/net'` instead of global `fetch`.
+ *
+ * Global `fetch` will appear to work in VSCode, but proxy support will be
+ * broken in JetBrains or CLI.
+ *
+ * If you must use Axios, **do** call `getAxiosSettings()` and spread into
+ * your Axios configuration:
+ *
+ * ```typescript
+ * import { getAxiosSettings } from '@/shared/net'
+ * await axios.get(url, {
+ *   headers: { 'X-FOO': 'BAR' },
+ *   ...getAxiosSettings()
+ * })
+ * ```
  *
  * ## Proxy Support
  *
- * Cline uses platform-specific fetch implementations to handle proxy configuration:
+ * Cline uses platform-specific fetch implementations to handle proxy
+ * configuration:
  * - **VSCode**: Uses global fetch (VSCode provides proxy configuration)
- * - **JetBrains/CLI**: Uses undici fetch with explicit ProxyAgent configuration
+ * - **JetBrains, CLI**: Uses undici fetch with explicit ProxyAgent
  *
  * Proxy configuration via standard environment variables:
  * - `http_proxy` / `HTTP_PROXY` - Proxy for HTTP requests
  * - `https_proxy` / `HTTPS_PROXY` - Proxy for HTTPS requests
  * - `no_proxy` / `NO_PROXY` - Comma-separated list of hosts to bypass proxy
  *
+ * Note, `http_proxy` etc. MUST specify the protocol to use for the proxy,
+ * for example, `https_proxy=http://proxy.corp.example:3128`. Simply specifying
+ * the proxy hostname will result in errors.
+ *
  * ## Certificate Trust
  *
- * IntelliJ exports its trusted certificates (system CAs + corporate CAs + user-added certs)
- * to a PEM file and sets NODE_EXTRA_CA_CERTS at Node process startup.
+ * Proxies often machine-in-the-middle HTTPS connections. To make this work,
+ * they generate self-signed certificates for a host, and the client is
+ * configured to trust the proxy as a certificate authority.
  *
- * This enables:
- * - Corporate MITM proxy certificates to be trusted
- * - Self-signed internal certificates to work
- * - Consistent TLS behavior between IntelliJ and Node.js
+ * VSCode transparently pulls trusted certificates from the operating system
+ * and configures node trust.
  *
- * ## Fetch Usage
+ * JetBrains exports trusted certificates from the OS and writes them to a
+ * temporary file, then configures node TLS by setting NODE_EXTRA_CA_CERTS.
  *
- * All fetch requests MUST use the exported fetch from this module to ensure proper proxy configuration.
- * Use `import { fetch } from '@/shared/net'` instead of global fetch.
+ * CLI users should set the NODE_EXTRA_CA_CERTS environment variable if
+ * necessary, because node does not automatically use the OS' trusted certs.
  *
- * Note: This pattern should be enforced through code review, as automated linting cannot distinguish
- * between imported and global fetch calls.
+ * ## Limitations in JetBrains & CLI
  *
- * ## Axios Configuration
+ * - Proxy settings are static at startup--restart required for changes
+ * - SOCKS proxies, PAC files not supported
+ * - Proxy authentication via env vars only
  *
- * All axios requests MUST use the fetch adapter with our configured fetch.
- * Use `getAxiosSettings()` or `createAxiosInstance()` instead of importing axios directly.
- *
- * ## Limitations
- *
- * - Proxy settings are static at startup (restart required for changes)
- * - SOCKS proxies not yet supported (requires additional undici configuration)
- * - PAC files not yet supported (long-term: requires callback to IntelliJ)
- * - Proxy authentication via env vars only (long-term: IntelliJ auth dialogs)
+ * These are not fundamental limitations, they just need integration work.
  *
  * ## Troubleshooting
  *
  * 1. Verify proxy env vars: `echo $http_proxy $https_proxy`
  * 2. Check certificates: `echo $NODE_EXTRA_CA_CERTS` (should point to PEM file)
- * 3. View logs: Check startup logs for proxy configuration messages
- * 4. Test connection: Use `curl` with same proxy env vars to isolate issues
+ * 3. View logs: Check ~/.cline/cline-core-service.log for network-related
+ *    failures.
+ * 4. Test connection: Use `curl -x host:port` etc. to isolate proxy
+ *    configuration versus client issues.
  *
  * @example
  * ```typescript
@@ -58,23 +76,10 @@
  * // Good - uses fetch adapter
  * import { getAxiosSettings } from '@/shared/net'
  * await axios.get(url, { ...getAxiosSettings() })
- *
- * // Better - use helper
- * import { createAxiosInstance } from '@/shared/net'
- * const client = createAxiosInstance({ timeout: 5000 })
- * await client.get(url)
- *
- * // Bad - linter will complain
- * import axios from 'axios'
- * await axios.get(url) // ❌ Doesn't use configured fetch
- *
- * // Bad - linter will complain
- * const response = await fetch(url) // ❌ Uses global fetch, not configured
  * ```
  */
 
 import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "undici"
-import { Logger } from "@/services/logging/Logger"
 
 /**
  * Platform-configured fetch that respects proxy settings.
@@ -87,7 +92,7 @@ import { Logger } from "@/services/logging/Logger"
  * ```
  */
 export const fetch: typeof globalThis.fetch = (() => {
-	// Note: Don't use Logging here; it may not be initialized.
+	// Note: Don't use Logger here; it may not be initialized.
 
 	// Detect if running in VSCode vs standalone (JetBrains/CLI)
 	// In VSCode, the vscode module is available
@@ -109,7 +114,8 @@ export const fetch: typeof globalThis.fetch = (() => {
 
 /**
  * Returns axios configuration for fetch adapter mode with our configured fetch.
- * This ensures axios uses our platform-specific fetch implementation with proper proxy configuration.
+ * This ensures axios uses our platform-specific fetch implementation with
+ * proper proxy configuration.
  *
  * @returns Configuration object with fetch adapter and configured fetch
  *
@@ -123,7 +129,6 @@ export const fetch: typeof globalThis.fetch = (() => {
  * ```
  */
 export function getAxiosSettings(): { adapter?: any; fetch?: typeof globalThis.fetch } {
-	Logger.info(`getAxiosSettings, http_proxy is ${process.env.http_proxy} https is ${process.env.https_proxy}`)
 	return {
 		adapter: "fetch" as any,
 		fetch, // Use our configured fetch
