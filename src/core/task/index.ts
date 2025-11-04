@@ -1749,10 +1749,20 @@ export class Task {
 			await setTimeoutPromise(50)
 		}
 
+		// Get truncation metadata from the process
+		const truncationMetadata = terminalManager.isProcessTruncated(terminalInfo.id)
+
 		const result = terminalManager.processOutput(
 			outputLines,
 			isSubagent ? terminalManager["subagentTerminalOutputLineLimit"] : undefined,
 			isSubagent,
+			truncationMetadata.truncated
+				? {
+						truncated: true,
+						omittedBytes: truncationMetadata.omittedBytes,
+						byteLimit: 256 * 1024,
+					}
+				: undefined,
 		)
 
 		if (didCancelViaUi) {

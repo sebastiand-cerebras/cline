@@ -551,15 +551,34 @@ class StandaloneTerminalManager {
 		return process ? process.isHot : false
 	}
 
-	processOutput(outputLines, overrideLimit, isSubagentCommand) {
+	isProcessTruncated(terminalId) {
+		const process = this.processes.get(terminalId)
+		return process
+			? { truncated: process.wasTruncated, omittedBytes: process.totalOmittedBytes }
+			: { truncated: false, omittedBytes: 0 }
+	}
+
+	processOutput(outputLines, overrideLimit, isSubagentCommand, truncationInfo) {
 		const limit = isSubagentCommand && overrideLimit ? overrideLimit : this.terminalOutputLineLimit
+
+		let result = ""
+
+		// Add byte-level truncation notice if applicable
+		if (truncationInfo && truncationInfo.truncated) {
+			result = buildTruncationNotice(truncationInfo.byteLimit, truncationInfo.omittedBytes) + "\n\n"
+		}
+
+		// Apply line-level truncation
 		if (outputLines.length > limit) {
 			const halfLimit = Math.floor(limit / 2)
 			const start = outputLines.slice(0, halfLimit)
 			const end = outputLines.slice(outputLines.length - halfLimit)
-			return `${start.join("\n")}\n... (output truncated) ...\n${end.join("\n")}`.trim()
+			result += `${start.join("\n")}\n... (output truncated) ...\n${end.join("\n")}`
+		} else {
+			result += outputLines.join("\n")
 		}
-		return outputLines.join("\n").trim()
+
+		return result.trim()
 	}
 
 	disposeAll() {

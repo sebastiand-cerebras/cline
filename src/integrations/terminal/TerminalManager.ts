@@ -4,6 +4,7 @@ import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 import { mergePromise, TerminalProcess, TerminalProcessResultPromise } from "./TerminalProcess"
 import { TerminalInfo, TerminalRegistry } from "./TerminalRegistry"
+import { buildTruncationNotice } from "./truncateTerminalBuffer"
 
 /*
 TerminalManager:
@@ -329,6 +330,13 @@ export class TerminalManager {
 		return process ? process.isHot : false
 	}
 
+	isProcessTruncated(terminalId: number): { truncated: boolean; omittedBytes: number } {
+		const process = this.processes.get(terminalId)
+		return process
+			? { truncated: process.wasTruncated, omittedBytes: process.totalOmittedBytes }
+			: { truncated: false, omittedBytes: 0 }
+	}
+
 	disposeAll() {
 		// for (const info of this.terminals) {
 		// 	//info.terminal.dispose() // dont want to dispose terminals when task is aborted
@@ -355,19 +363,36 @@ export class TerminalManager {
 		this.subagentTerminalOutputLineLimit = limit
 	}
 
-	public processOutput(outputLines: string[], overrideLimit?: number, isSubagentCommand?: boolean): string {
+	public processOutput(
+		outputLines: string[],
+		overrideLimit?: number,
+		isSubagentCommand?: boolean,
+		truncationInfo?: { truncated: boolean; omittedBytes: number; byteLimit: number },
+	): string {
 		const limit = isSubagentCommand
 			? overrideLimit !== undefined
 				? overrideLimit
 				: this.subagentTerminalOutputLineLimit
 			: this.terminalOutputLineLimit
+
+		let result = ""
+
+		// Add byte-level truncation notice if applicable
+		if (truncationInfo && truncationInfo.truncated) {
+			result = buildTruncationNotice(truncationInfo.byteLimit, truncationInfo.omittedBytes) + "\n\n"
+		}
+
+		// Apply line-level truncation
 		if (outputLines.length > limit) {
 			const halfLimit = Math.floor(limit / 2)
 			const start = outputLines.slice(0, halfLimit)
 			const end = outputLines.slice(outputLines.length - halfLimit)
-			return `${start.join("\n")}\n... (output truncated) ...\n${end.join("\n")}`.trim()
+			result += `${start.join("\n")}\n... (output truncated) ...\n${end.join("\n")}`
+		} else {
+			result += outputLines.join("\n")
 		}
-		return outputLines.join("\n").trim()
+
+		return result.trim()
 	}
 
 	setDefaultTerminalProfile(profileId: string): { closedCount: number; busyTerminals: TerminalInfo[] } {
