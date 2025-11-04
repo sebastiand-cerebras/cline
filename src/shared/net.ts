@@ -1,14 +1,14 @@
 /**
  * # Network Support for Cline
  *
- * ## Development
+ * ## Development Guidelines
  *
  * **Do** use `import { fetch } from '@/shared/net'` instead of global `fetch`.
  *
  * Global `fetch` will appear to work in VSCode, but proxy support will be
  * broken in JetBrains or CLI.
  *
- * If you must use Axios, **do** call `getAxiosSettings()` and spread into
+ * If you use Axios, **do** call `getAxiosSettings()` and spread into
  * your Axios configuration:
  *
  * ```typescript
@@ -18,6 +18,20 @@
  *   ...getAxiosSettings()
  * })
  * ```
+ *
+ * **Do** remember to pass our `fetch` into your API clients:
+ *
+ * ```typescript
+ * import OpenAI from "openai"
+ * import { fetch } from "@/shared/net"
+ * this.client = new OpenAI({
+ *   apiKey: '...',
+ *   fetch, // Use configured fetch with proxy support
+ * })
+ * ```
+ *
+ * If you neglect this step, inference won't work in JetBrains and CLI
+ * through proxies.
  *
  * ## Proxy Support
  *
@@ -73,7 +87,7 @@
  * import { fetch } from '@/shared/net'
  * const response = await fetch(url)
  *
- * // Good - uses fetch adapter
+ * // Good - configures axios to use configured fetch
  * import { getAxiosSettings } from '@/shared/net'
  * await axios.get(url, { ...getAxiosSettings() })
  * ```
@@ -91,26 +105,20 @@ import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "un
  * const response = await fetch('https://api.example.com')
  * ```
  */
-export const fetch: typeof globalThis.fetch = (() => {
+export let fetch: typeof globalThis.fetch = globalThis.fetch
+
+/**
+ * Configures this module's `fetch` for the core outside VSCode. This function
+ * must be called at startup before `fetch` is used.
+ */
+export function configureFetchForStandalone() {
 	// Note: Don't use Logger here; it may not be initialized.
 
-	// Detect if running in VSCode vs standalone (JetBrains/CLI)
-	// In VSCode, the vscode module is available
-	/* TODO: turn this off for vscode
-	const isVSCode = typeof (globalThis as any).vscode !== "undefined"
-
-	if (isVSCode) {
-		// VSCode: use global fetch (VSCode's proxy config applies)
-		return globalThis.fetch
-	}
-	*/
-
-	// JetBrains/CLI: configure undici with ProxyAgent
+	// Standalone (JetBrains/CLI): configure undici with ProxyAgent
 	const agent = new EnvHttpProxyAgent({})
 	setGlobalDispatcher(agent)
-
-	return undiciFetch as unknown as typeof globalThis.fetch
-})()
+	fetch = undiciFetch as unknown as typeof globalThis.fetch
+}
 
 /**
  * Returns axios configuration for fetch adapter mode with our configured fetch.
