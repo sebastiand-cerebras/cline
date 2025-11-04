@@ -1,5 +1,7 @@
 import { Buffer } from "buffer"
 
+export const DEFAULT_TERMINAL_OUTPUT_BYTE_LIMIT = 256 * 1024
+
 export interface AppendWithLimitOptions {
 	existing: string
 	addition: string
